@@ -93,25 +93,23 @@ function HomeClaimEntry({ onNavigate }: HomeClaimEntryProps) {
           </p>
         </div>
 
-        {/* Big Button with QR Code Icon */}
-        <div className="w-full flex flex-col items-center gap-3">
+        {/* Big Square Button with QR Code Icon Only (No Text) */}
+        <div className="w-full flex flex-col items-center gap-3 my-2">
           <button
             onClick={() => setShowScanner(true)}
-            className="w-full py-6 px-6 bg-haven-orange-deep hover:bg-haven-orange-bright active:translate-y-1 text-white font-display text-2xl rounded-3xl shadow-tactile active:shadow-tactile-active transition-all flex items-center justify-center gap-4 cursor-pointer group"
+            aria-label="Scan QR Code"
+            className="w-48 h-48 sm:w-56 sm:h-56 aspect-square bg-haven-orange-deep hover:bg-haven-orange-bright active:translate-y-1 text-white rounded-3xl shadow-tactile active:shadow-tactile-active transition-all flex items-center justify-center cursor-pointer group"
           >
-            <div className="p-2.5 bg-white/20 rounded-2xl group-hover:scale-110 transition-transform">
-              <QrCode className="w-9 h-9 text-white" />
-            </div>
-            <span>Scan QR Code</span>
+            <QrCode className="w-24 h-24 sm:w-28 sm:h-28 text-white group-hover:scale-105 transition-transform" />
           </button>
 
-          {/* Little text under it: (cant scan) to input code manually */}
+          {/* Little text under it: (cant scan) to input the code manually */}
           <button
             type="button"
             onClick={() => setShowManualInput(!showManualInput)}
-            className="text-xs text-haven-brown-light hover:text-haven-orange-deep font-display underline transition-colors cursor-pointer py-1"
+            className="text-xs text-haven-brown-light hover:text-haven-orange-deep font-display underline transition-colors cursor-pointer py-1.5"
           >
-            {showManualInput ? '(close manual input)' : "(can't scan? enter code manually)"}
+            {showManualInput ? '(close manual input)' : '(cant scan) to input the code manually'}
           </button>
 
           {/* Expandable Manual Code Input */}

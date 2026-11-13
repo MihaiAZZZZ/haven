@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, X, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
+import { X, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
 
 interface CameraQrScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -92,19 +92,13 @@ export const CameraQrScanner: React.FC<CameraQrScannerProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-[#121214] flex flex-col items-center justify-between p-4 font-body animate-in fade-in duration-200">
       {/* Top Header */}
-      <div className="w-full max-w-md flex items-center justify-between pt-2 pb-4 text-white">
-        <div className="flex items-center gap-2">
-          <Camera className="w-5 h-5 text-haven-orange-bright" />
-          <span className="font-display text-base tracking-wide text-white">
-            Scan Paper QR Code
-          </span>
-        </div>
+      <div className="w-full max-w-md flex items-center justify-end pt-2 pb-3 text-white">
         <button
           onClick={onClose}
-          className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+          className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
           title="Close scanner"
         >
-          <X className="w-5 h-5" />
+          <X className="w-6 h-6" />
         </button>
       </div>
 

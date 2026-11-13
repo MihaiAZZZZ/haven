@@ -21,3 +21,46 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Clean QR Scanner Styling */
+#haven-qr-reader {
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+  position: relative !important;
+}
+
+#haven-qr-reader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 1.5rem !important;
+}
+
+#haven-qr-reader canvas {
+  display: none !important;
+}
+
+#haven-qr-reader__scan_region {
+  border: none !important;
+}
+
+@keyframes scan-laser {
+  0% {
+    top: 5%;
+    opacity: 0.8;
+  }
+  50% {
+    top: 90%;
+    opacity: 1;
+  }
+  100% {
+    top: 5%;
+    opacity: 0.8;
+  }
+}
+
+.animate-scan-laser {
+  animation: scan-laser 2.4s ease-in-out infinite;
+}
+

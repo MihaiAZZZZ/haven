@@ -126,11 +126,6 @@ export const CameraQrScanner: React.FC<CameraQrScannerProps> = ({
             </div>
           </div>
 
-          {/* Animated Scanning Laser Line */}
-          {!isStarting && (
-            <div className="pointer-events-none absolute left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-haven-orange-bright to-transparent shadow-[0_0_8px_#fa681b] animate-scan-laser" />
-          )}
-
           {/* Starting State */}
           {isStarting && (
             <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-2 text-white">

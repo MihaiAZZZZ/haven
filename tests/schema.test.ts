@@ -136,6 +136,32 @@ describe("Supabase Schema & Migration Specification", () => {
     });
   });
 
+  describe("Atomic Issue Voucher RPC Stored Procedure", () => {
+    it("declares issue_game_voucher function with SECURITY DEFINER and search_path", () => {
+      expect(migrationSql).toMatch(
+        /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.issue_game_voucher\s*\(\s*p_game_id\s+UUID\s*\)\s*RETURNS\s+JSONB/i
+      );
+      expect(migrationSql).toMatch(/LANGUAGE\s+plpgsql/i);
+      expect(migrationSql).toMatch(/SECURITY\s+DEFINER/i);
+      expect(migrationSql).toMatch(/SET\s+search_path\s*=\s*public/i);
+    });
+
+    it("uses FOR UPDATE SKIP LOCKED to prevent concurrency races when selecting available key", () => {
+      expect(migrationSql).toMatch(/FOR\s+UPDATE\s+SKIP\s+LOCKED/i);
+    });
+
+    it("atomically marks key as assigned and inserts voucher", () => {
+      expect(migrationSql).toMatch(/UPDATE\s+public\.game_keys\s+SET\s+status\s*=\s*'assigned'/i);
+      expect(migrationSql).toMatch(/INSERT\s+INTO\s+public\.vouchers\s*\(game_id,\s*key_id\)/i);
+    });
+
+    it("grants execute permissions on issue_game_voucher function", () => {
+      expect(migrationSql).toMatch(
+        /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.issue_game_voucher\(UUID\)\s+TO\s+anon,\s*authenticated,\s*service_role/i
+      );
+    });
+  });
+
   describe("Seed Data & Environment Configuration", () => {
     it("seed.sql exists and contains valid inserts for games, game_keys, and vouchers", () => {
       expect(fs.existsSync(seedPath)).toBe(true);

@@ -122,3 +122,52 @@ $$;
 
 -- Grant execution to anon, authenticated, and service_role
 GRANT EXECUTE ON FUNCTION public.redeem_game_voucher(UUID) TO anon, authenticated, service_role;
+
+-- Atomic Voucher Issuance Stored Procedure
+CREATE OR REPLACE FUNCTION public.issue_game_voucher(p_game_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_result JSONB;
+BEGIN
+    WITH picked_key AS (
+      SELECT id FROM public.game_keys
+      WHERE game_id = p_game_id AND status = 'available'
+      LIMIT 1
+      FOR UPDATE SKIP LOCKED
+    ),
+    updated_key AS (
+      UPDATE public.game_keys
+      SET status = 'assigned'
+      WHERE id IN (SELECT id FROM picked_key)
+      RETURNING id, game_id
+    ),
+    new_voucher AS (
+      INSERT INTO public.vouchers (game_id, key_id)
+      SELECT game_id, id FROM updated_key
+      RETURNING id, game_id, key_id, is_redeemed, created_at
+    )
+    SELECT jsonb_build_object(
+      'id', v.id,
+      'game_id', v.game_id,
+      'key_id', v.key_id,
+      'is_redeemed', v.is_redeemed,
+      'created_at', v.created_at
+    )
+    INTO v_result
+    FROM new_voucher v;
+
+    IF v_result IS NULL THEN
+        RAISE EXCEPTION 'No available keys for this game';
+    END IF;
+
+    RETURN v_result;
+END;
+$$;
+
+-- Grant execution to anon, authenticated, and service_role
+GRANT EXECUTE ON FUNCTION public.issue_game_voucher(UUID) TO anon, authenticated, service_role;
+

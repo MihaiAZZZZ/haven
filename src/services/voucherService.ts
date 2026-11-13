@@ -115,7 +115,7 @@ export async function getGamesWithCounts(
 ): Promise<GameWithInventory[]> {
   const { data: games, error: gamesError } = await client
     .from('games')
-    .select('*')
+    .select('id, title, slug, image_url, created_at, game_keys(id, status)')
     .order('title', { ascending: true });
 
   if (gamesError) {
@@ -126,21 +126,9 @@ export async function getGamesWithCounts(
     return [];
   }
 
-  const hasNestedKeys = games.some((g: Record<string, unknown>) =>
-    Array.isArray(g.game_keys)
-  );
+  const hasEmbeddedKeys = games.some((g) => Array.isArray((g as Record<string, unknown>).game_keys));
 
-  const keysByGame: Record<string, { available: number; total: number }> = {};
-
-  if (hasNestedKeys) {
-    for (const g of games as Array<Record<string, unknown>>) {
-      const keys = (g.game_keys as Array<{ status: string }>) || [];
-      keysByGame[g.id as string] = {
-        total: keys.length,
-        available: keys.filter((k) => k.status === 'available').length,
-      };
-    }
-  } else {
+  if (!hasEmbeddedKeys) {
     const { data: keys, error: keysError } = await client
       .from('game_keys')
       .select('id, game_id, status');
@@ -149,24 +137,29 @@ export async function getGamesWithCounts(
       throw new Error(keysError.message);
     }
 
-    for (const k of (keys as Array<{ id: string; game_id: string; status: string }>) || []) {
-      if (!keysByGame[k.game_id]) {
-        keysByGame[k.game_id] = { available: 0, total: 0 };
-      }
-      keysByGame[k.game_id].total += 1;
-      if (k.status === 'available') {
-        keysByGame[k.game_id].available += 1;
-      }
-    }
+    const keyList = keys || [];
+    return (games as Array<Record<string, unknown>>).map((game) => {
+      const gKeys = keyList.filter((k) => k.game_id === game.id);
+      const available_keys = gKeys.filter((k) => k.status === 'available').length;
+      const total_keys = gKeys.length;
+      const { game_keys: _ignored, ...gameData } = game;
+      return {
+        ...(gameData as unknown as Game),
+        available_keys,
+        total_keys,
+      };
+    });
   }
 
   return (games as Array<Record<string, unknown>>).map((game) => {
+    const keys = (game.game_keys as Array<{ id?: string; status?: string }>) || [];
+    const available_keys = keys.filter((k) => k.status === 'available').length;
+    const total_keys = keys.length;
     const { game_keys: _ignored, ...gameData } = game;
-    const counts = keysByGame[game.id as string] || { available: 0, total: 0 };
     return {
       ...(gameData as unknown as Game),
-      available_keys: counts.available,
-      total_keys: counts.total,
+      available_keys,
+      total_keys,
     };
   });
 }
@@ -200,17 +193,57 @@ export async function addGameKeys(
     throw new Error(error.message);
   }
 
-  return data ? data.length : cleanKeys.length;
+  return data ? data.length : 0;
 }
 
 /**
  * Finds an available key for the game, marks it 'assigned', and creates a voucher record.
+ * Uses atomic PostgreSQL stored procedure `issue_game_voucher` with client-side fallback.
  */
 export async function issueVoucher(
   gameId: string,
   client: SupabaseClient = defaultSupabase
 ): Promise<IssuedVoucher> {
-  // 1. Find one available key
+  // 1. Attempt atomic stored procedure execution if RPC is supported
+  if (typeof client.rpc === 'function') {
+    try {
+      const { data, error } = await client.rpc('issue_game_voucher', {
+        p_game_id: gameId,
+      });
+
+      if (!error && data) {
+        const payload = typeof data === 'string' ? JSON.parse(data) : data;
+        return {
+          id: payload.id,
+          game_id: payload.game_id,
+          key_id: payload.key_id,
+          created_at: payload.created_at,
+        };
+      }
+
+      if (error) {
+        if (/No available keys/i.test(error.message)) {
+          throw new Error('No available keys for this game');
+        }
+
+        // If the error indicates missing function in mock/DB, fall through to fallback
+        const isMissingFunction =
+          error.code === 'PGRST202' ||
+          /function.*does not exist/i.test(error.message) ||
+          /could not find the function/i.test(error.message);
+
+        if (!isMissingFunction) {
+          throw new Error(error.message);
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && /No available keys/i.test(err.message)) {
+        throw err;
+      }
+    }
+  }
+
+  // 2. Client-side fallback for testing / environments without RPC
   const { data: key, error: keyError } = await client
     .from('game_keys')
     .select('id')
@@ -223,7 +256,6 @@ export async function issueVoucher(
     throw new Error('No available keys for this game');
   }
 
-  // 2. Mark the key as assigned
   const { error: updateError } = await client
     .from('game_keys')
     .update({ status: 'assigned' })
@@ -233,7 +265,6 @@ export async function issueVoucher(
     throw new Error(updateError.message);
   }
 
-  // 3. Create the voucher record
   const { data: voucher, error: voucherError } = await client
     .from('vouchers')
     .insert({

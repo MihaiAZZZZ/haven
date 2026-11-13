@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-haven-orange-deep: #ed5615;
+  --color-haven-orange-bright: #fa681b;
+  --color-haven-orange-mid: #fc8616;
+  --color-haven-green: #b8c220;
+  --color-haven-green-deep: #97a01a;
+  --color-haven-yellow: #ffd059;
+  --color-haven-butter: #ffe382;
+  --color-haven-brown-dark: #b8774a;
+  --color-haven-brown-light: #dda47d;
+  --color-haven-blue-deep: #2cbf90;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

@@ -127,10 +127,6 @@ export const AdminPage: React.FC = () => {
             </a>
           </div>
         </div>
-
-        <footer className="mt-8 text-[11px] text-haven-brown-light">
-          Hack Club Haven • Staff & Organizer Administration
-        </footer>
       </div>
     );
   }

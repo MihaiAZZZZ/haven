@@ -273,10 +273,6 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ voucherId: propVoucherId }
         )}
       </div>
 
-      {/* Footer */}
-      <footer className="mt-8 text-center text-[11px] text-haven-brown-light">
-        <p>Made with 💖 for Hack Club Haven • Questions? Ask your organizers!</p>
-      </footer>
     </div>
   );
 };

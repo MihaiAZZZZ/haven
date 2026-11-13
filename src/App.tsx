@@ -160,10 +160,6 @@ function HomeClaimEntry({ onNavigate }: HomeClaimEntryProps) {
         />
       )}
 
-      {/* Footer */}
-      <footer className="mt-8 text-[11px] text-haven-brown-light">
-        Hack Club Haven • Official Game Prize Withdrawal
-      </footer>
     </div>
   );
 }

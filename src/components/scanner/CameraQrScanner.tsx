@@ -137,24 +137,29 @@ export const CameraQrScanner: React.FC<CameraQrScannerProps> = ({
           </div>
         )}
 
-        <p className="text-white/80 text-xs text-center mt-4 max-w-xs leading-relaxed">
+        <p className="text-white/90 text-sm sm:text-base text-center mt-4 max-w-xs leading-relaxed">
           Align the QR code from your printed game voucher inside the box. It will scan automatically!
         </p>
       </div>
 
       {/* Footer Instructions with Mascot */}
-      <div className="w-full max-w-md bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-3 flex items-center gap-3 text-left mb-2">
+      <div className="w-full max-w-md bg-white/15 backdrop-blur-md border border-white/30 rounded-3xl p-4 sm:p-5 flex items-center gap-4 text-left mb-4 shadow-xl">
         <img
           src="/images/daven.webp"
           alt="Daven"
-          className="w-10 h-10 object-contain shrink-0"
+          className="w-14 h-14 sm:w-16 sm:h-16 object-contain shrink-0 drop-shadow-md"
           onError={(e) => {
             (e.target as HTMLImageElement).src = '/assets/daven.webp';
           }}
         />
-        <p className="text-white/90 text-[11px] leading-tight">
-          <strong>Tip:</strong> If lighting is dim, move closer to a lamp or hold the paper flat!
-        </p>
+        <div className="flex flex-col gap-0.5">
+          <span className="font-display text-sm sm:text-base text-haven-yellow tracking-wide">
+            Daven's Tip 🦔
+          </span>
+          <p className="text-white text-sm sm:text-base leading-snug font-body">
+            If lighting is dim, move closer to a lamp or hold the paper flat!
+          </p>
+        </div>
       </div>
     </div>
   );

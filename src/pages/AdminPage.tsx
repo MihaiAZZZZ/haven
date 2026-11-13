@@ -3,12 +3,18 @@ import { getGamesWithCounts } from '../services/voucherService';
 import type { GameWithInventory } from '../types/database';
 import { VoucherDispenser } from '../components/admin/VoucherDispenser';
 import { GameCatalog } from '../components/admin/GameCatalog';
-import { Ticket, Package, RefreshCw, Loader2 } from 'lucide-react';
+import { Ticket, Package, RefreshCw, Loader2, Lock, LogOut, KeyRound } from 'lucide-react';
 import '../styles/print.css';
 
 export const AdminPage: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return sessionStorage.getItem('haven_admin_auth') === 'true';
+  });
+  const [passwordInput, setPasswordInput] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+
   const [games, setGames] = useState<GameWithInventory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'dispenser' | 'inventory'>('dispenser');
 
   const fetchInventory = async () => {
@@ -24,8 +30,110 @@ export const AdminPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchInventory();
-  }, []);
+    if (isAuthenticated) {
+      fetchInventory();
+    }
+  }, [isAuthenticated]);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const expectedPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'haven2026';
+
+    if (passwordInput === expectedPassword) {
+      sessionStorage.setItem('haven_admin_auth', 'true');
+      setIsAuthenticated(true);
+      setAuthError(null);
+    } else {
+      setAuthError('Incorrect organizer password. Access denied.');
+    }
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('haven_admin_auth');
+    setIsAuthenticated(false);
+    setPasswordInput('');
+  };
+
+  // If not authenticated, render password lock screen
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#fffbf0] text-haven-brown-dark font-body flex flex-col justify-between items-center p-6 text-center">
+        <div className="w-full max-w-sm flex flex-col items-center pt-10">
+          <img
+            src="/images/haven-logo-color.webp"
+            alt="Hack Club Haven"
+            className="h-14 w-auto object-contain drop-shadow-sm mb-4"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/images/logo.webp';
+            }}
+          />
+
+          <div className="relative mb-4">
+            <img
+              src="/images/daven.webp"
+              alt="Daven"
+              className="w-24 h-auto drop-shadow-md"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/assets/daven.webp';
+              }}
+            />
+            <div className="absolute -bottom-1 -right-1 bg-haven-orange-deep text-white p-1.5 rounded-full shadow-md">
+              <Lock className="w-4 h-4" />
+            </div>
+          </div>
+
+          <h1 className="font-display text-2xl text-haven-orange-deep mb-1">
+            Organizer Access Only
+          </h1>
+          <p className="text-xs text-haven-brown-light max-w-xs leading-relaxed mb-6">
+            Enter your organizer password to unlock the game voucher dispenser and inventory dashboard.
+          </p>
+
+          <div className="bg-white border-2 border-haven-brown-dark/20 rounded-3xl p-6 shadow-card w-full flex flex-col gap-3">
+            {authError && (
+              <div className="bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded-xl text-xs font-semibold">
+                {authError}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="flex flex-col gap-3">
+              <div className="relative">
+                <input
+                  type="password"
+                  autoFocus
+                  required
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="Enter organizer password..."
+                  className="w-full bg-[#faf5ea] border border-haven-brown-light/40 rounded-2xl pl-10 pr-4 py-3 text-sm font-body text-haven-brown-dark placeholder-haven-brown-light/60 focus:outline-none focus:border-haven-orange-deep shadow-xs"
+                />
+                <KeyRound className="w-4 h-4 text-haven-brown-light absolute left-3.5 top-3.5 pointer-events-none" />
+              </div>
+
+              <button
+                type="submit"
+                disabled={!passwordInput}
+                className="w-full py-3.5 px-4 bg-haven-orange-deep hover:bg-haven-orange-bright active:translate-y-0.5 text-white font-display text-sm rounded-2xl shadow-tactile active:shadow-tactile-active transition-all cursor-pointer disabled:opacity-50"
+              >
+                Unlock Dashboard
+              </button>
+            </form>
+
+            <a
+              href="/"
+              className="text-xs text-haven-brown-light hover:text-haven-orange-deep underline font-display mt-2"
+            >
+              Back to Player Redemption
+            </a>
+          </div>
+        </div>
+
+        <footer className="mt-8 text-[11px] text-haven-brown-light">
+          Hack Club Haven • Staff & Organizer Administration
+        </footer>
+      </div>
+    );
+  }
 
   const totalAvailable = games.reduce((acc, g) => acc + g.available_keys, 0);
   const totalKeys = games.reduce((acc, g) => acc + g.total_keys, 0);
@@ -38,11 +146,11 @@ export const AdminPage: React.FC = () => {
           <div className="flex items-center gap-3">
             <a href="/" className="flex items-center gap-2">
               <img
-                src="/images/logo.webp"
+                src="/images/haven-logo-color.webp"
                 alt="Hack Club Haven"
                 className="h-8 w-auto object-contain"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/assets/logo.webp';
+                  (e.target as HTMLImageElement).src = '/images/logo.webp';
                 }}
               />
             </a>
@@ -56,17 +164,19 @@ export const AdminPage: React.FC = () => {
             <button
               onClick={fetchInventory}
               disabled={loading}
-              className="p-2 rounded-xl text-haven-brown-dark hover:bg-haven-butter/40 transition-colors"
+              className="p-2 rounded-xl text-haven-brown-dark hover:bg-haven-butter/40 transition-colors cursor-pointer"
               title="Refresh inventory"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
-            <a
-              href="/"
-              className="text-xs font-display text-haven-brown-dark hover:text-haven-orange-deep underline"
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 text-xs font-display text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 py-1.5 px-3 rounded-xl transition-colors cursor-pointer"
+              title="Log out of organizer dashboard"
             >
-              Public Claim View
-            </a>
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Log Out</span>
+            </button>
           </div>
         </div>
       </header>

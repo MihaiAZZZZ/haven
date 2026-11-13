@@ -3,7 +3,7 @@ import { ClaimPage } from './pages/ClaimPage';
 import { AdminPage } from './pages/AdminPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { CameraQrScanner } from './components/scanner/CameraQrScanner';
-import { QrCode, ShieldCheck, ArrowRight, X } from 'lucide-react';
+import { QrCode, ArrowRight, X } from 'lucide-react';
 
 export function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
@@ -148,16 +148,7 @@ function HomeClaimEntry({ onNavigate }: HomeClaimEntryProps) {
             </div>
           )}
 
-          {/* Organizer Link */}
-          <div className="mt-6">
-            <a
-              href="/admin"
-              className="inline-flex items-center gap-1.5 text-xs font-display text-haven-brown-light hover:text-haven-orange-deep py-2 px-3 rounded-xl transition-colors"
-            >
-              <ShieldCheck className="w-4 h-4 text-haven-orange-deep" />
-              <span>Organizer Portal & Card Dispenser</span>
-            </a>
-          </div>
+          {/* Hidden Admin: Organizers navigate directly to /admin */}
         </div>
       </div>
 

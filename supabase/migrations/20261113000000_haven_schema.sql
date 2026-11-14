@@ -39,17 +39,38 @@ ALTER TABLE public.game_keys ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vouchers ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies:
--- Games: anyone can read
+-- Games: anyone can read, organizers can insert/update
 CREATE POLICY "Allow public read access to games" ON public.games
     FOR SELECT TO public USING (true);
+
+CREATE POLICY "Allow public insert to games" ON public.games
+    FOR INSERT TO public WITH CHECK (true);
+
+CREATE POLICY "Allow public update to games" ON public.games
+    FOR UPDATE TO public USING (true);
 
 -- Vouchers: anyone can read basic metadata (excluding key_id)
 CREATE POLICY "Allow public read access to voucher status" ON public.vouchers
     FOR SELECT TO public USING (true);
 
+CREATE POLICY "Allow staff insert vouchers" ON public.vouchers
+    FOR INSERT TO anon, authenticated WITH CHECK (true);
+
 -- Game Keys: blocked for public; only accessible by service_role / internal procedures
 CREATE POLICY "Allow service role full access to keys" ON public.game_keys
     FOR ALL TO service_role USING (true);
+
+CREATE POLICY "Allow staff insert game keys" ON public.game_keys
+    FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+CREATE POLICY "Allow staff select key status" ON public.game_keys
+    FOR SELECT TO anon, authenticated USING (true);
+
+-- Shield unredeemed key_code from public network inspection
+REVOKE SELECT ON public.game_keys FROM anon, authenticated, public;
+GRANT SELECT (id, game_id, status, created_at) ON public.game_keys TO anon, authenticated, public;
+GRANT INSERT (game_id, key_code, status) ON public.game_keys TO anon, authenticated;
+GRANT ALL ON public.game_keys TO service_role;
 
 -- Atomic Redeem Stored Procedure
 CREATE OR REPLACE FUNCTION public.redeem_game_voucher(p_voucher_id UUID)

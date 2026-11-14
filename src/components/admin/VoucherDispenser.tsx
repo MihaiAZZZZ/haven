@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import type { GameWithInventory } from '../../types/database';
 import { issueVoucher } from '../../services/voucherService';
-import { PrintModal } from '../print/PrintModal';
-import { Ticket, Loader2, AlertCircle } from 'lucide-react';
+import { PrintModal, type PrintableVoucherItem } from '../print/PrintModal';
+import { Ticket, Loader2, AlertCircle, Printer, Layers, Plus, Minus, Trash2 } from 'lucide-react';
 
 interface VoucherDispenserProps {
   games: GameWithInventory[];
@@ -14,33 +14,67 @@ export const VoucherDispenser: React.FC<VoucherDispenserProps> = ({
   onVoucherIssued,
 }) => {
   const [issuingGameId, setIssuingGameId] = useState<string | null>(null);
-  const [issuedVoucher, setIssuedVoucher] = useState<{
-    voucherId: string;
-    gameTitle: string;
-    imageUrl?: string | null;
-  } | null>(null);
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [printQueue, setPrintQueue] = useState<PrintableVoucherItem[]>([]);
+  const [modalVouchers, setModalVouchers] = useState<PrintableVoucherItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleDrawVoucher = async (game: GameWithInventory) => {
+  const getQuantity = (gameId: string, maxAvailable: number) => {
+    const q = quantities[gameId] ?? 1;
+    return Math.min(Math.max(1, q), Math.max(1, maxAvailable));
+  };
+
+  const setQuantity = (gameId: string, qty: number, maxAvailable: number) => {
+    const safeQty = Math.min(Math.max(1, qty), maxAvailable);
+    setQuantities((prev) => ({ ...prev, [gameId]: safeQty }));
+  };
+
+  // Dispenses N vouchers for a game and either opens them in modal or adds to queue
+  const handleIssueBatch = async (
+    game: GameWithInventory,
+    count: number,
+    action: 'print-now' | 'add-to-queue'
+  ) => {
     if (game.available_keys <= 0 || issuingGameId) return;
+
+    const actualCount = Math.min(count, game.available_keys);
+    if (actualCount <= 0) return;
 
     setIssuingGameId(game.id);
     setError(null);
 
+    const newlyIssued: PrintableVoucherItem[] = [];
+
     try {
-      const voucher = await issueVoucher(game.id);
-      setIssuedVoucher({
-        voucherId: voucher.id,
-        gameTitle: game.title,
-        imageUrl: game.image_url,
-      });
+      for (let i = 0; i < actualCount; i++) {
+        const voucher = await issueVoucher(game.id);
+        newlyIssued.push({
+          voucherId: voucher.id,
+          gameTitle: game.title,
+          imageUrl: game.image_url,
+        });
+      }
+
       onVoucherIssued();
+
+      if (action === 'print-now') {
+        setModalVouchers(newlyIssued);
+      } else {
+        setPrintQueue((prev) => [...prev, ...newlyIssued]);
+      }
     } catch (err: unknown) {
       setError(
         err instanceof Error
           ? err.message
-          : `Failed to issue voucher for ${game.title}.`
+          : `Failed to issue vouchers for ${game.title}.`
       );
+      if (newlyIssued.length > 0) {
+        if (action === 'print-now') {
+          setModalVouchers(newlyIssued);
+        } else {
+          setPrintQueue((prev) => [...prev, ...newlyIssued]);
+        }
+      }
     } finally {
       setIssuingGameId(null);
     }
@@ -48,16 +82,45 @@ export const VoucherDispenser: React.FC<VoucherDispenserProps> = ({
 
   return (
     <div className="w-full flex flex-col gap-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-haven-brown-light/30 pb-3">
+      {/* Header Info */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-haven-brown-light/30 pb-3">
         <div>
           <h2 className="font-display text-xl text-haven-brown-dark flex items-center gap-2">
             <Ticket className="w-6 h-6 text-haven-orange-deep" />
-            <span>Instant Voucher Dispenser</span>
+            <span>Voucher Dispenser & Multi-Card Printing</span>
           </h2>
           <p className="text-xs text-haven-brown-light mt-0.5">
-            Press any game button to pair an available key, generate a unique single-use QR voucher, and print the card.
+            Print single cards or combine multiple cards from any game into a multi-card print sheet.
           </p>
         </div>
+
+        {/* Print Queue Status / Trigger */}
+        {printQueue.length > 0 && (
+          <div className="flex items-center gap-2 bg-white border-2 border-haven-orange-deep/40 rounded-2xl p-2 shadow-xs animate-in fade-in duration-200">
+            <div className="flex items-center gap-1.5 px-2">
+              <Layers className="w-4 h-4 text-haven-orange-deep" />
+              <span className="font-display text-xs text-haven-brown-dark">
+                {printQueue.length} {printQueue.length === 1 ? 'card' : 'cards'} on sheet
+              </span>
+            </div>
+
+            <button
+              onClick={() => setModalVouchers(printQueue)}
+              className="py-1.5 px-3 bg-haven-orange-deep hover:bg-haven-orange-bright text-white font-display text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Preview & Print Sheet</span>
+            </button>
+
+            <button
+              onClick={() => setPrintQueue([])}
+              className="p-1.5 text-haven-brown-light hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+              title="Clear print sheet"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -82,77 +145,158 @@ export const VoucherDispenser: React.FC<VoucherDispenserProps> = ({
           {games.map((game) => {
             const isOutOfKeys = game.available_keys <= 0;
             const isThisIssuing = issuingGameId === game.id;
+            const qty = getQuantity(game.id, game.available_keys);
 
             return (
-              <button
+              <div
                 key={game.id}
-                onClick={() => handleDrawVoucher(game)}
-                disabled={isOutOfKeys || Boolean(issuingGameId)}
-                className={`relative group p-4 rounded-3xl border-2 text-left flex items-center gap-3 transition-all cursor-pointer ${
+                className={`p-4 rounded-3xl border-2 flex flex-col gap-3 transition-all ${
                   isOutOfKeys
-                    ? 'bg-haven-butter/20 border-haven-brown-light/30 opacity-60 cursor-not-allowed'
-                    : 'bg-white border-haven-brown-dark/20 hover:border-haven-orange-deep hover:bg-haven-butter/10 shadow-tactile active:translate-y-0.5 active:shadow-tactile-active'
+                    ? 'bg-haven-butter/20 border-haven-brown-light/30 opacity-60'
+                    : 'bg-white border-haven-brown-dark/20 shadow-tactile'
                 }`}
               >
-                {/* Game Icon / Image */}
-                {game.image_url ? (
-                  <img
-                    src={game.image_url}
-                    alt={game.title}
-                    className="w-14 h-14 rounded-2xl object-cover shrink-0 border border-haven-brown-light/30 shadow-xs"
-                  />
-                ) : (
-                  <div className="w-14 h-14 rounded-2xl bg-haven-orange-deep text-white font-display text-2xl flex items-center justify-center shrink-0 shadow-xs">
-                    🎮
+                {/* Game Top Info */}
+                <div className="flex items-center gap-3">
+                  {game.image_url ? (
+                    <img
+                      src={game.image_url}
+                      alt={game.title}
+                      className="w-13 h-13 rounded-2xl object-cover shrink-0 border border-haven-brown-light/30 shadow-xs"
+                    />
+                  ) : (
+                    <div className="w-13 h-13 rounded-2xl bg-haven-orange-deep text-white font-display text-xl flex items-center justify-center shrink-0 shadow-xs">
+                      🎮
+                    </div>
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-display text-base text-haven-brown-dark truncate">
+                      {game.title}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span
+                        className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${
+                          isOutOfKeys
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-haven-green/20 text-haven-green-deep'
+                        }`}
+                      >
+                        {game.available_keys} left
+                      </span>
+                      <span className="text-[11px] text-haven-brown-light">
+                        ({game.total_keys} total)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quantity Controls & Quick Presets */}
+                {!isOutOfKeys && (
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-haven-brown-light/20">
+                    <span className="text-xs font-display text-haven-brown-light">Quantity:</span>
+
+                    <div className="flex items-center gap-1 bg-[#faf5ea] border border-haven-brown-light/30 rounded-xl p-1">
+                      <button
+                        onClick={() => setQuantity(game.id, qty - 1, game.available_keys)}
+                        disabled={qty <= 1 || isThisIssuing}
+                        className="p-1 hover:bg-haven-butter/60 rounded-lg text-haven-brown-dark disabled:opacity-30 cursor-pointer"
+                        title="Decrease"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+
+                      <input
+                        type="number"
+                        min={1}
+                        max={game.available_keys}
+                        value={qty}
+                        onChange={(e) => setQuantity(game.id, parseInt(e.target.value) || 1, game.available_keys)}
+                        disabled={isThisIssuing}
+                        className="w-10 text-center font-mono font-bold text-xs bg-transparent text-haven-brown-dark focus:outline-none"
+                      />
+
+                      <button
+                        onClick={() => setQuantity(game.id, qty + 1, game.available_keys)}
+                        disabled={qty >= game.available_keys || isThisIssuing}
+                        className="p-1 hover:bg-haven-butter/60 rounded-lg text-haven-brown-dark disabled:opacity-30 cursor-pointer"
+                        title="Increase"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Quick presets if multiple keys available */}
+                    {game.available_keys >= 4 && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setQuantity(game.id, 4, game.available_keys)}
+                          className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md border cursor-pointer ${
+                            qty === 4
+                              ? 'bg-haven-orange-deep text-white border-haven-orange-deep'
+                              : 'bg-white text-haven-brown-dark border-haven-brown-light/30 hover:bg-haven-butter/30'
+                          }`}
+                        >
+                          4
+                        </button>
+                        {game.available_keys >= 6 && (
+                          <button
+                            onClick={() => setQuantity(game.id, 6, game.available_keys)}
+                            className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md border cursor-pointer ${
+                              qty === 6
+                                ? 'bg-haven-orange-deep text-white border-haven-orange-deep'
+                                : 'bg-white text-haven-brown-dark border-haven-brown-light/30 hover:bg-haven-butter/30'
+                            }`}
+                          >
+                            6
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-display text-base text-haven-brown-dark truncate group-hover:text-haven-orange-deep transition-colors">
-                    {game.title}
-                  </h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span
-                      className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${
-                        isOutOfKeys
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-haven-green/20 text-haven-green-deep'
-                      }`}
-                    >
-                      {game.available_keys} left
-                    </span>
-                    <span className="text-[11px] text-haven-brown-light">
-                      ({game.total_keys} total)
-                    </span>
-                  </div>
-                </div>
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={() => handleIssueBatch(game, qty, 'print-now')}
+                    disabled={isOutOfKeys || Boolean(issuingGameId)}
+                    className="flex-1 py-2.5 px-3 bg-haven-orange-deep hover:bg-haven-orange-bright active:translate-y-0.5 text-white font-display text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {isThisIssuing ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Print {qty > 1 ? `${qty} Cards` : 'Now'}</span>
+                      </>
+                    )}
+                  </button>
 
-                {/* Action Indicator */}
-                <div className="shrink-0">
-                  {isThisIssuing ? (
-                    <div className="p-2 bg-haven-orange-deep/10 text-haven-orange-deep rounded-2xl">
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    </div>
-                  ) : (
-                    <div className="px-3 py-2 bg-haven-orange-deep group-hover:bg-haven-orange-bright text-white text-xs font-display rounded-xl shadow-xs transition-colors">
-                      + Print
-                    </div>
-                  )}
+                  <button
+                    onClick={() => handleIssueBatch(game, qty, 'add-to-queue')}
+                    disabled={isOutOfKeys || Boolean(issuingGameId)}
+                    className="py-2.5 px-3 bg-white border border-haven-brown-light/40 hover:border-haven-orange-deep hover:bg-haven-butter/20 text-haven-brown-dark font-display text-xs rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
+                    title="Add to multi-game print sheet"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-haven-orange-deep" />
+                    <span>Sheet</span>
+                  </button>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
       )}
 
-      {/* Print Modal */}
-      {issuedVoucher && (
+      {/* Print Modal for Single or Multiple Vouchers */}
+      {modalVouchers && modalVouchers.length > 0 && (
         <PrintModal
-          voucherId={issuedVoucher.voucherId}
-          gameTitle={issuedVoucher.gameTitle}
-          imageUrl={issuedVoucher.imageUrl}
-          onClose={() => setIssuedVoucher(null)}
+          vouchers={modalVouchers}
+          onClose={() => setModalVouchers(null)}
+          onRemoveVoucher={(removedId) => {
+            setPrintQueue((prev) => prev.filter((item) => item.voucherId !== removedId));
+          }}
         />
       )}
     </div>

@@ -1,0 +1,208 @@
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE IF NOT EXISTS public.games (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  image_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.game_keys (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  game_id UUID NOT NULL REFERENCES public.games(id) ON DELETE CASCADE,
+  key_code TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'assigned', 'redeemed')),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.vouchers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  game_id UUID NOT NULL REFERENCES public.games(id) ON DELETE RESTRICT,
+  key_id UUID NOT NULL UNIQUE REFERENCES public.game_keys(id) ON DELETE RESTRICT,
+  is_redeemed BOOLEAN NOT NULL DEFAULT false,
+  redeemed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_game_keys_game_status ON public.game_keys(game_id, status);
+CREATE INDEX IF NOT EXISTS idx_vouchers_game_id ON public.vouchers(game_id);
+
+ALTER TABLE public.games ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.game_keys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vouchers ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read access to games" ON public.games;
+DROP POLICY IF EXISTS "Allow public insert to games" ON public.games;
+DROP POLICY IF EXISTS "Allow public update to games" ON public.games;
+DROP POLICY IF EXISTS "Allow public read access to voucher status" ON public.vouchers;
+DROP POLICY IF EXISTS "Allow staff insert vouchers" ON public.vouchers;
+DROP POLICY IF EXISTS "Allow service role full access to keys" ON public.game_keys;
+DROP POLICY IF EXISTS "Allow staff insert game keys" ON public.game_keys;
+DROP POLICY IF EXISTS "Allow staff select key status" ON public.game_keys;
+
+CREATE POLICY "Allow public read access to games"
+  ON public.games
+  FOR SELECT
+  TO public
+  USING (true);
+
+CREATE POLICY "Allow public insert to games"
+  ON public.games
+  FOR INSERT
+  TO public
+  WITH CHECK (true);
+
+CREATE POLICY "Allow public update to games"
+  ON public.games
+  FOR UPDATE
+  TO public
+  USING (true);
+
+CREATE POLICY "Allow public read access to voucher status"
+  ON public.vouchers
+  FOR SELECT
+  TO public
+  USING (true);
+
+CREATE POLICY "Allow staff insert vouchers"
+  ON public.vouchers
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Allow service role full access to keys"
+  ON public.game_keys
+  FOR ALL
+  TO service_role
+  USING (true);
+
+CREATE POLICY "Allow staff insert game keys"
+  ON public.game_keys
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Allow staff select key status"
+  ON public.game_keys
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+REVOKE SELECT ON public.game_keys FROM anon, authenticated, public;
+GRANT SELECT (id, game_id, status, created_at) ON public.game_keys TO anon, authenticated, public;
+GRANT INSERT (game_id, key_code, status) ON public.game_keys TO anon, authenticated;
+GRANT ALL ON public.game_keys TO service_role;
+
+CREATE OR REPLACE FUNCTION public.redeem_game_voucher(p_voucher_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_voucher RECORD;
+  v_key_code TEXT;
+  v_game_title TEXT;
+  v_game_image TEXT;
+BEGIN
+  UPDATE public.vouchers
+  SET is_redeemed = true,
+      redeemed_at = now()
+  WHERE id = p_voucher_id AND is_redeemed = false
+  RETURNING id, game_id, key_id, redeemed_at INTO v_voucher;
+
+  IF NOT FOUND THEN
+    SELECT v.is_redeemed, v.redeemed_at, g.title, g.image_url
+    INTO v_voucher
+    FROM public.vouchers v
+    JOIN public.games g ON g.id = v.game_id
+    WHERE v.id = p_voucher_id;
+
+    IF FOUND THEN
+      RETURN jsonb_build_object(
+        'success', false,
+        'error', 'ALREADY_REDEEMED',
+        'message', 'This voucher has already been claimed.',
+        'redeemed_at', v_voucher.redeemed_at,
+        'game_title', v_voucher.title,
+        'image_url', v_voucher.image_url
+      );
+    ELSE
+      RETURN jsonb_build_object(
+        'success', false,
+        'error', 'INVALID_VOUCHER',
+        'message', 'Voucher not found.'
+      );
+    END IF;
+  END IF;
+
+  UPDATE public.game_keys
+  SET status = 'redeemed'
+  WHERE id = v_voucher.key_id
+  RETURNING key_code INTO v_key_code;
+
+  SELECT title, image_url
+  INTO v_game_title, v_game_image 
+  FROM public.games 
+  WHERE id = v_voucher.game_id;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'voucher_id', v_voucher.id,
+    'game_title', v_game_title,
+    'image_url', v_game_image,
+    'key_code', v_key_code,
+    'redeemed_at', v_voucher.redeemed_at
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.redeem_game_voucher(UUID) TO anon, authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.issue_game_voucher(p_game_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_result JSONB;
+BEGIN
+  WITH picked_key AS (
+    SELECT id
+    FROM public.game_keys
+    WHERE game_id = p_game_id AND status = 'available'
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED
+  ),
+  updated_key AS (
+    UPDATE public.game_keys
+    SET status = 'assigned'
+    WHERE id IN (SELECT id FROM picked_key)
+    RETURNING id, game_id
+  ),
+  new_voucher AS (
+    INSERT INTO public.vouchers (game_id, key_id)
+    SELECT game_id, id FROM updated_key
+    RETURNING id, game_id, key_id, is_redeemed, created_at
+  )
+  SELECT jsonb_build_object(
+    'id', v.id,
+    'game_id', v.game_id,
+    'key_id', v.key_id,
+    'is_redeemed', v.is_redeemed,
+    'created_at', v.created_at
+  )
+  INTO v_result
+  FROM new_voucher v;
+
+  IF v_result IS NULL THEN
+    RAISE EXCEPTION 'No available keys for this game';
+  END IF;
+
+  RETURN v_result;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.issue_game_voucher(UUID) TO anon, authenticated, service_role;

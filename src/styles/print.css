@@ -16,19 +16,25 @@
     top: 0 !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 10px !important;
+    padding: 0 !important;
     background: white !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    align-content: flex-start !important;
+    gap: 3mm !important;
   }
 
-  /* Ensure page breaks cleanly between cards if batch printing */
-  .print-page-break {
-    page-break-after: always;
-    break-after: page;
+  /* Prevent individual cards from splitting across page breaks */
+  .printable-card-area > div {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin: 2mm !important;
   }
 
   /* Suppress browser print headers and footers */
   @page {
-    margin: 0.5cm;
+    margin: 6mm;
     size: auto;
   }
 }

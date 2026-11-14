@@ -18,7 +18,7 @@ export const PrintableVoucherCard: React.FC<PrintableVoucherCardProps> = ({
 
   return (
     <div
-      className={`bg-white border-2 border-dashed border-haven-brown-dark rounded-2xl flex flex-col justify-between items-center text-center shadow-xs relative overflow-hidden print:shadow-none print:border-solid print:border-haven-brown-dark mx-auto ${
+      className={`bg-white border-2 border-dashed border-haven-brown-dark rounded-2xl flex flex-col justify-between items-center text-center shadow-xs relative overflow-hidden print:overflow-visible print:shadow-none print:border-2 print:border-dashed print:border-haven-brown-dark mx-auto ${
         compact
           ? 'w-[230px] h-[320px] p-2.5 my-1'
           : 'w-[270px] h-[380px] p-3.5 my-1.5'

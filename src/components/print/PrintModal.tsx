@@ -54,10 +54,10 @@ export const PrintModal: React.FC<PrintModalProps> = ({
   const isMultiple = items.length > 1;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-hidden">
-      <div className="bg-[#fffbf0] border-2 border-haven-brown-dark rounded-3xl max-w-4xl w-full max-h-[92vh] shadow-2xl flex flex-col relative animate-in zoom-in-95 duration-200 overflow-hidden">
-        {/* Sticky Header */}
-        <div className="p-4 border-b border-haven-brown-light/20 flex items-center justify-between shrink-0 bg-[#fffbf0] z-10">
+    <div className="print-modal-overlay fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-hidden">
+      <div className="print-modal-dialog bg-[#fffbf0] border-2 border-haven-brown-dark rounded-3xl max-w-4xl w-full max-h-[92vh] shadow-2xl flex flex-col relative animate-in zoom-in-95 duration-200 overflow-hidden">
+        {/* Sticky Header - hidden on print */}
+        <div className="print-modal-header print:hidden p-4 border-b border-haven-brown-light/20 flex items-center justify-between shrink-0 bg-[#fffbf0] z-10">
           <div>
             <h2 className="font-display text-lg sm:text-xl text-haven-brown-dark leading-tight">
               {isMultiple ? `Print Sheet (${items.length} Cards)` : 'Voucher Card Ready! 🎉'}
@@ -101,10 +101,10 @@ export const PrintModal: React.FC<PrintModalProps> = ({
         </div>
 
         {/* Scrollable Preview Area */}
-        <div className="flex-1 overflow-y-auto p-4 min-h-0 bg-[#faf5ea]/40">
+        <div className="print-scroll-container flex-1 overflow-y-auto p-4 min-h-0 bg-[#faf5ea]/40">
           <div className="printable-card-area w-full flex flex-wrap justify-center items-start gap-3">
             {items.map((item) => (
-              <div key={item.voucherId} className="relative group">
+              <div key={item.voucherId} className="printable-card-wrapper relative group">
                 <PrintableVoucherCard
                   voucherId={item.voucherId}
                   gameTitle={item.gameTitle}
@@ -127,8 +127,8 @@ export const PrintModal: React.FC<PrintModalProps> = ({
           </div>
         </div>
 
-        {/* Sticky Footer */}
-        <div className="p-3 sm:p-4 border-t border-haven-brown-light/20 flex items-center justify-between gap-3 shrink-0 bg-[#fffbf0] z-10">
+        {/* Sticky Footer - hidden on print */}
+        <div className="print-modal-footer print:hidden p-3 sm:p-4 border-t border-haven-brown-light/20 flex items-center justify-between gap-3 shrink-0 bg-[#fffbf0] z-10">
           <div className="text-xs text-haven-brown-light hidden sm:block">
             {compact ? 'Compact size fits 4–6 cards per page' : 'Standard full-size cards'}
           </div>

@@ -82,7 +82,8 @@ export const VoucherDispenser: React.FC<VoucherDispenserProps> = ({
 
   return (
     <div className="w-full flex flex-col gap-4">
-      {/* Header Info */}
+      <div className="print:hidden w-full flex flex-col gap-4">
+        {/* Header Info */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-haven-brown-light/30 pb-3">
         <div>
           <h2 className="font-display text-xl text-haven-brown-dark flex items-center gap-2">
@@ -288,6 +289,7 @@ export const VoucherDispenser: React.FC<VoucherDispenserProps> = ({
           })}
         </div>
       )}
+      </div>
 
       {/* Print Modal for Single or Multiple Vouchers */}
       {modalVouchers && modalVouchers.length > 0 && (

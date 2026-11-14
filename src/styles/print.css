@@ -1,40 +1,103 @@
 @media print {
-  /* Hide all regular web page elements */
-  body * {
-    visibility: hidden !important;
+  /* 1. Reset document canvas */
+  html,
+  body,
+  #root,
+  .min-h-screen,
+  main {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 
-  /* Make printable card area and children visible */
-  .printable-card-area,
-  .printable-card-area * {
-    visibility: visible !important;
+  /* 2. Hide all non-printable UI elements */
+  header,
+  footer,
+  nav,
+  button,
+  .print\:hidden,
+  .print-modal-header,
+  .print-modal-footer {
+    display: none !important;
   }
 
+  /* 3. Un-constrain modal containers so they don't clip or center on paper */
+  .print-modal-overlay {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    overflow: visible !important;
+    inset: auto !important;
+  }
+
+  .print-modal-dialog {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    overflow: visible !important;
+    animation: none !important;
+  }
+
+  .print-scroll-container {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+
+  /* 4. Natural document flow for the card grid */
   .printable-card-area {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: static !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+    align-items: flex-start !important;
+    align-content: flex-start !important;
+    gap: 4mm !important;
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
-    background: white !important;
-    display: flex !important;
-    flex-wrap: wrap !important;
-    justify-content: center !important;
-    align-content: flex-start !important;
-    gap: 3mm !important;
+    background: #ffffff !important;
+    overflow: visible !important;
   }
 
-  /* Prevent individual cards from splitting across page breaks */
-  .printable-card-area > div {
+  /* 5. Prevent cards from being split across page boundaries */
+  .printable-card-wrapper {
+    display: inline-block !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
     margin: 2mm !important;
   }
 
-  /* Suppress browser print headers and footers */
+  /* 6. Suppress default browser page headers and footers */
   @page {
-    margin: 6mm;
+    margin: 8mm;
     size: auto;
   }
 }
